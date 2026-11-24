@@ -1,0 +1,13 @@
+# name;pve_vmid;ovirt_disk_id;pve_slot;boot[;ovirt_vm_name]
+#
+# name          label used on the command line and in file names (<name>-<slot>.qcow2)
+# pve_vmid      target VM on PVE (created beforehand, without disks)
+# ovirt_disk_id folder name after images/ (= disk ID in oVirt Storage > Disks)
+# pve_slot      target bus+slot on PVE: scsi0, sata0, virtio0 ... (don't change after the export started)
+# boot          1 = boot disk (exactly one per VM), 0 = data disk
+# ovirt_vm_name optional, only if the oVirt VM name differs from <name>
+#
+# Example (Windows without VirtIO drivers -> sata0):
+# termserver;102;c4b3a291-0f8e-4d7c-b6a5-948372615f0e;sata0;1;termserver.example.com
+# fileserver;101;3f2a9c1e-7b4d-4e8a-9c2f-1a2b3c4d5e6f;scsi0;1
+# fileserver;101;8d7e6f5a-4b3c-4d2e-8f1a-0b9c8d7e6f5a;scsi1;0
