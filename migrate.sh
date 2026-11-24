@@ -553,6 +553,10 @@ cmd_export() {
   # Snapshots: a disk with snapshots consists of several volumes; exporting only the
   # top one would be incomplete. Offer to remove them (merge into the disk) first.
   if ((${#snaplist[@]})); then
+    # Oldest first: each removal commits the data written after that snapshot into
+    # the volume below, so every delta is copied about once (newest first would
+    # copy recent data several times). Field 6 = date "YYYY-MM-DD HH:MM".
+    mapfile -t snaplist < <(printf '%s\n' "${snaplist[@]}" | sort -t';' -k1,1 -k6,6)
     echo
     warn "${#snaplist[@]} snapshot(s) found - the export should be done without snapshots:"
     printf '  %-14s %-16s %-10s %-10s %s\n' VM DATE TYPE STATUS DESCRIPTION >&2
@@ -565,9 +569,9 @@ cmd_export() {
     done
     warn "Removing a snapshot merges it into the disk (the disk stays, only the restore point is gone)."
     if ((YES)); then
-      log "SNAP   -y: removing the ${#snaplist[@]} snapshot(s) automatically"
+      log "SNAP   -y: removing the ${#snaplist[@]} snapshot(s) automatically, oldest first"
     else
-      confirm "Remove these ${#snaplist[@]} snapshot(s) one by one and continue?" \
+      confirm "Remove these ${#snaplist[@]} snapshot(s) one by one (oldest first) and continue?" \
         || die "aborted - nothing was changed. Remove the snapshots in oVirt, then rerun the export."
     fi
     for p in "${snaplist[@]}"; do
@@ -1445,7 +1449,7 @@ main() {
       -y|--yes)     YES=1 ;;
       -n|--dry-run) DRY_RUN=1 ;;
       -f|--force)   FORCE=1 ;;
-      -s|--start)      START_VM=1 ;;
+      -s|--start)   START_VM=1 ;;
       -r|--restore-on-abort) RESTORE_ON_ABORT=1 ;;
       -w|--watch)   WATCH=60; if [[ ${2:-} =~ ^[0-9]+$ ]]; then WATCH=$2; shift; fi ;;
       -h|--help)    usage; exit 0 ;;

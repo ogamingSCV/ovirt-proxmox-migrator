@@ -37,7 +37,9 @@ oVirt host (runs the datamover)                      PVE host
 
 ## Snapshots
 
-A disk with snapshots consists of several volumes. Exporting only the top one would give an incomplete disk, so `export` checks every VM first. If it finds snapshots, it lists them and asks whether to remove them. Removing a snapshot in oVirt merges its data into the disk: the disk and its data stay, only the restore point is gone. The script then removes them one at a time, waits for each merge (up to `SNAPSHOT_TIMEOUT`), verifies that no snapshots remain and every disk is still present, and continues with the export. Answer `N` and nothing is changed. With `-y` the regular snapshots are removed without asking. Previews, stateless snapshots and unknown types are never touched; the export stops and you handle them in oVirt.
+A disk with snapshots consists of several volumes. Exporting only the top one would give an incomplete disk, so `export` checks every VM first. If it finds snapshots, it lists them and asks whether to remove them. Removing a snapshot in oVirt merges its data into the disk: the disk and its data stay, only the restore point is gone. The script then removes them one at a time, **oldest first**, waits for each merge (up to `SNAPSHOT_TIMEOUT`), verifies that no snapshots remain and every disk is still present, and continues with the export. Why oldest first: as far as we know, oVirt merges "backwards" when a snapshot is removed. The data written after that snapshot is committed into the volume below it, so the work is roughly the data written after the snapshot. Oldest first copies each change about once; newest first would merge recent data down layer by layer and copy it several times. The result is the same either way, oldest first is just usually less I/O.
+
+Answer `N` and nothing is changed. With `-y` the regular snapshots are removed without asking. Previews, stateless snapshots and unknown types are never touched; the export stops and you handle them in oVirt.
 
 ## Why a temporary helper VM (datamover)?
 
@@ -120,7 +122,7 @@ termserver;102;c4b3a291-0f8e-4d7c-b6a5-948372615f0e;sata0;1;termserver.example.c
 ```bash
 # PVE (tmux), start first:
 ./migrate.sh import
-./migrate.sh import --start             # also start each VM once all its disks are imported
+./migrate.sh import -s                  # also start each VM once all its disks are imported
 
 # oVirt host (tmux):
 ./migrate.sh export fileserver appserver   # preflight table, confirm, shut down, move, export
@@ -132,7 +134,7 @@ termserver;102;c4b3a291-0f8e-4d7c-b6a5-948372615f0e;sata0;1;termserver.example.c
 ./migrate.sh list                         # VMs by size; on PVE: what's already imported
 
 # rollback / cleanup (oVirt host):
-./migrate.sh restore fileserver --start
+./migrate.sh restore fileserver -s
 ./migrate.sh release fileserver
 ```
 
@@ -348,3 +350,15 @@ export  appserver-scsi1            QUEUED      -        -        -        -
 | `QUEUED` stays forever in status | The export session was lost (e.g. SSH disconnect without tmux) before that disk started. Rerun `export`; finished disks are skipped. |
 | `STALE … already imported on PVE` | That disk on the PVE VM is from an outdated export. Remove it from the PVE VM (`qm set <vmid> --delete <slot>`, then delete the unused disk) before the next attempt; the import would otherwise HOLD on the occupied slot. |
 | `nmbd` fails at boot | The network came up too late. Use `auto <if>` in `/etc/network/interfaces`. |
+
+---
+
+## Disclaimer
+
+**Idea, concept and requirements:** the author of this repository. The toolkit grew out of a real oVirt → Proxmox VE migration, and its design decisions and safety requirements come from that work.
+
+**Code and documentation:** written by an AI assistant (Claude, by Anthropic) from the author's specifications, in an iterative conversation.
+
+**Review and testing:** code reviewed and tested by the author.
+
+This toolkit moves and changes virtual machines and their disks. Use it at your own risk and without any warranty. Read the code, test with `-n` (dry-run) and a non-critical VM first, and make sure you have current backups before migrating anything that matters.
